@@ -130,22 +130,12 @@ export default function AdminDashboard() {
           </div>
           <ResponsiveContainer width="100%" height={200}>
             <AreaChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="gradSales" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={ORANGE} stopOpacity={0.15} />
-                  <stop offset="95%" stopColor={ORANGE} stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="gradProfit" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={PURPLE} stopOpacity={0.15} />
-                  <stop offset="95%" stopColor={PURPLE} stopOpacity={0} />
-                </linearGradient>
-              </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
               <XAxis dataKey={xKey} tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} tickFormatter={(v) => `₱${(v / 1000).toFixed(0)}k`} />
               <Tooltip formatter={(v: number) => `₱${v.toLocaleString()}`} contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e2e8f0" }} />
-              <Area type="monotone" dataKey="sales" stroke={ORANGE} strokeWidth={2} fill="url(#gradSales)" name="Sales" />
-              <Area type="monotone" dataKey="profit" stroke={PURPLE} strokeWidth={2} fill="url(#gradProfit)" name="Profit" />
+              <Area type="monotone" dataKey="sales" stroke={ORANGE} strokeWidth={2} fill={ORANGE} fillOpacity={0.08} name="Sales" />
+              <Area type="monotone" dataKey="profit" stroke={PURPLE} strokeWidth={2} fill={PURPLE} fillOpacity={0.08} name="Profit" />
             </AreaChart>
           </ResponsiveContainer>
           <div className="flex gap-4 mt-2">
@@ -216,11 +206,10 @@ export default function AdminDashboard() {
                   <td className={`px-4 py-3 text-right font-semibold ${p.retailStock < 30 ? "text-amber-500" : "text-slate-700"}`}>{p.retailStock}</td>
                   <td className={`px-4 py-3 text-right font-semibold ${p.shelfStock < 10 ? "text-red-500" : "text-slate-700"}`}>{p.shelfStock}</td>
                   <td className="px-4 py-3">
-                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                      p.action === "OK" ? "bg-green-50 text-green-600" :
-                      p.action.includes("Expiring") ? "bg-amber-50 text-amber-600" :
-                      "bg-red-50 text-red-600"
-                    }`}>{p.action}</span>
+                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${p.action === "OK" ? "bg-green-50 text-green-600" :
+                        p.action.includes("Expiring") ? "bg-amber-50 text-amber-600" :
+                          "bg-red-50 text-red-600"
+                      }`}>{p.action}</span>
                   </td>
                 </tr>
               ))}
