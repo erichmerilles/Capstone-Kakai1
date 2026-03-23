@@ -1,13 +1,57 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Search, Plus, Pencil, Trash2, X, Phone, Mail, MapPin } from "lucide-react";
-import { suppliers as initialSuppliers, Supplier } from "../../data/mockData";
+
+const API_URL = "http://localhost/kakai1_r/api";
+
+export interface Supplier {
+  id: number;
+  name: string;
+  contact: string; // Maps to contact_person in DB
+  phone: string;
+  email: string;
+  address: string;
+  products: string; // Handled locally for UI
+  status: string;   // Handled locally for UI
+}
 
 export default function SupplierDirectory() {
-  const [suppliers, setSuppliers] = useState<Supplier[]>(initialSuppliers);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editSupplier, setEditSupplier] = useState<Supplier | null>(null);
   const [form, setForm] = useState<Partial<Supplier>>({});
+  const [isLoading, setIsLoading] = useState(true);
+
+  // 1. Fetch Suppliers from Database
+  const fetchSuppliers = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/suppliers/get_suppliers.php`, { credentials: "include" });
+      const data = await response.json();
+      if (data.success) {
+        // Map database columns to match your UI preferences
+        const formatted = data.data.map((s: any) => ({
+          id: s.id,
+          name: s.name,
+          contact: s.contact_person || "",
+          phone: s.phone || "",
+          email: s.email || "",
+          address: s.address || "",
+          products: "General Wholesale", // Default since it's not in DB
+          status: "Active" // Default to keep your stat cards working
+        }));
+        setSuppliers(formatted);
+      }
+    } catch (error) {
+      console.error("Failed to fetch suppliers", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSuppliers();
+  }, []);
 
   const filtered = suppliers.filter((s) =>
     s.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -15,20 +59,67 @@ export default function SupplierDirectory() {
     s.products.toLowerCase().includes(search.toLowerCase())
   );
 
-  const openNew = () => { setEditSupplier(null); setForm({ status: "Active" }); setShowForm(true); };
+  const openNew = () => { setEditSupplier(null); setForm({ status: "Active", products: "General Wholesale" }); setShowForm(true); };
   const openEdit = (s: Supplier) => { setEditSupplier(s); setForm(s); setShowForm(true); };
 
-  const save = () => {
-    if (editSupplier) {
-      setSuppliers((prev) => prev.map((s) => s.id === editSupplier.id ? { ...s, ...form } as Supplier : s));
-    } else {
-      const newId = Math.max(...suppliers.map((s) => s.id)) + 1;
-      setSuppliers((prev) => [...prev, { ...form, id: newId } as Supplier]);
+  // 2. Save to Database
+  const save = async () => {
+    if (!form.name) return alert("Supplier name is required.");
+
+    const endpoint = editSupplier ? "edit_supplier.php" : "add_supplier.php";
+
+    // Package data for your MySQL database
+    const payload = {
+      id: editSupplier?.id,
+      name: form.name,
+      contact_person: form.contact, // Map UI 'contact' to DB 'contact_person'
+      phone: form.phone,
+      email: form.email,
+      address: form.address
+    };
+
+    try {
+      const response = await fetch(`${API_URL}/suppliers/${endpoint}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        fetchSuppliers(); // Refresh from DB instantly
+        setShowForm(false);
+      } else {
+        alert("Failed: " + data.message);
+      }
+    } catch (error) {
+      alert("Network error.");
     }
-    setShowForm(false);
   };
 
-  const del = (id: number) => { if (confirm("Delete this supplier?")) setSuppliers((prev) => prev.filter((s) => s.id !== id)); };
+  // 3. Delete from Database
+  const del = async (id: number) => {
+    if (!confirm("Delete this supplier?")) return;
+
+    try {
+      const response = await fetch(`${API_URL}/suppliers/delete_supplier.php`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ id })
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        fetchSuppliers();
+      } else {
+        alert("Failed to delete: " + data.message);
+      }
+    } catch (error) {
+      alert("Network error.");
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -70,7 +161,11 @@ export default function SupplierDirectory() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {filtered.map((s) => (
+              {isLoading ? (
+                <tr><td colSpan={8} className="py-8 text-center text-slate-400">Loading suppliers...</td></tr>
+              ) : filtered.length === 0 ? (
+                <tr><td colSpan={8} className="py-8 text-center text-slate-400">No suppliers found.</td></tr>
+              ) : filtered.map((s) => (
                 <tr key={s.id} className="hover:bg-slate-50/50">
                   <td className="px-4 py-3 text-slate-700 font-medium">{s.name}</td>
                   <td className="px-4 py-3 text-slate-600">{s.contact}</td>
@@ -115,12 +210,15 @@ export default function SupplierDirectory() {
                 <div><label className="text-slate-500 text-xs mb-1 block">Email</label><input value={form.email || ""} onChange={(e) => setForm({ ...form, email: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" /></div>
               </div>
               <div><label className="text-slate-500 text-xs mb-1 block">Address</label><input value={form.address || ""} onChange={(e) => setForm({ ...form, address: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" /></div>
-              <div><label className="text-slate-500 text-xs mb-1 block">Products Supplied</label><input value={form.products || ""} onChange={(e) => setForm({ ...form, products: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" /></div>
+
+              {/* Optional: Kept visually for UI parity, but not saved to the DB */}
+              <div><label className="text-slate-500 text-xs mb-1 block">Products Supplied (Display Only)</label><input value={form.products || ""} onChange={(e) => setForm({ ...form, products: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" /></div>
               <div><label className="text-slate-500 text-xs mb-1 block">Status</label>
                 <select value={form.status || "Active"} onChange={(e) => setForm({ ...form, status: e.target.value as any })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
                   <option>Active</option><option>Inactive</option>
                 </select>
               </div>
+
               <div className="flex gap-3 pt-2">
                 <button onClick={() => setShowForm(false)} className="flex-1 border border-slate-200 text-slate-600 rounded-lg py-2.5 text-sm font-medium hover:bg-slate-50">Cancel</button>
                 <button onClick={save} className="flex-1 bg-orange-500 hover:bg-orange-600 text-white rounded-lg py-2.5 text-sm font-medium transition-colors">Save</button>

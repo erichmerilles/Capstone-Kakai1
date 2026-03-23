@@ -1,5 +1,6 @@
 import { createBrowserRouter, Navigate } from "react-router";
 import { Layout } from "./components/layout/Layout";
+import ProtectedRoute from "./components/layout/ProtectedRoute";
 import Login from "./pages/Login";
 
 // Admin
@@ -32,54 +33,78 @@ import CustomerPage from "./pages/customer/CustomerPage";
 export const router = createBrowserRouter([
   { path: "/", element: <Navigate to="/login" replace /> },
   { path: "/login", element: <Login /> },
-  { path: "/customer", element: <CustomerPage /> },
 
-  // Admin routes
+  // --- CUSTOMER ROUTES ---
+  {
+    path: "/customer",
+    element: <ProtectedRoute allowedRoles={["customer", "admin"]} />,
+    children: [
+      { index: true, element: <CustomerPage /> }
+    ]
+  },
+
+  // --- ADMIN ROUTES ---
   {
     path: "/admin",
-    element: <Layout />,
+    // Protect the entire /admin section. Only admins get past this line.
+    element: <ProtectedRoute allowedRoles={["admin"]} />,
     children: [
-      { index: true, element: <Navigate to="/admin/dashboard" replace /> },
-      { path: "dashboard", element: <AdminDashboard /> },
-      { path: "pos", element: <POS /> },
-      { path: "online-orders", element: <OnlineOrders /> },
-      { path: "products", element: <ProductMasterList /> },
-      { path: "receive-return", element: <ReceiveReturn /> },
-      { path: "inventory-control", element: <InventoryControl /> },
-      { path: "suppliers", element: <SupplierDirectory /> },
-      { path: "profitability", element: <ProfitabilityReports /> },
-      { path: "forecast", element: <InventoryForecast /> },
-      { path: "expiry-stocks", element: <ExpiryLowStock /> },
-      { path: "users", element: <UserManagement /> },
-      { path: "access-control", element: <AccessControl /> },
-      { path: "activity-log", element: <ActivityLog /> },
+      {
+        element: <Layout />, // Apply the sidebar layout to all valid admin routes
+        children: [
+          { index: true, element: <Navigate to="/admin/dashboard" replace /> },
+          { path: "dashboard", element: <AdminDashboard /> },
+          { path: "pos", element: <POS /> },
+          { path: "online-orders", element: <OnlineOrders /> },
+          { path: "products", element: <ProductMasterList /> },
+          { path: "receive-return", element: <ReceiveReturn /> },
+          { path: "inventory-control", element: <InventoryControl /> },
+          { path: "suppliers", element: <SupplierDirectory /> },
+          { path: "profitability", element: <ProfitabilityReports /> },
+          { path: "forecast", element: <InventoryForecast /> },
+          { path: "expiry-stocks", element: <ExpiryLowStock /> },
+          { path: "users", element: <UserManagement /> },
+          { path: "access-control", element: <AccessControl /> },
+          { path: "activity-log", element: <ActivityLog /> },
+        ]
+      }
     ],
   },
 
-  // Stockman routes
+  // --- STOCKMAN ROUTES ---
   {
     path: "/stockman",
-    element: <Layout />,
+    element: <ProtectedRoute allowedRoles={["stockman", "admin"]} />,
     children: [
-      { index: true, element: <Navigate to="/stockman/dashboard" replace /> },
-      { path: "dashboard", element: <StockmanDashboard /> },
-      { path: "products", element: <ProductMasterList /> },
-      { path: "receive-return", element: <ReceiveReturn /> },
-      { path: "inventory-control", element: <InventoryControl /> },
-      { path: "suppliers", element: <SupplierDirectory /> },
+      {
+        element: <Layout />,
+        children: [
+          { index: true, element: <Navigate to="/stockman/dashboard" replace /> },
+          { path: "dashboard", element: <StockmanDashboard /> },
+          { path: "products", element: <ProductMasterList /> },
+          { path: "receive-return", element: <ReceiveReturn /> },
+          { path: "inventory-control", element: <InventoryControl /> },
+          { path: "suppliers", element: <SupplierDirectory /> },
+        ]
+      }
     ],
   },
 
-  // Cashier routes
+  // --- CASHIER ROUTES ---
   {
     path: "/cashier",
-    element: <Layout />,
+    element: <ProtectedRoute allowedRoles={["cashier", "admin"]} />,
     children: [
-      { index: true, element: <Navigate to="/cashier/dashboard" replace /> },
-      { path: "dashboard", element: <CashierDashboard /> },
-      { path: "pos", element: <POS /> },
-      { path: "online-orders", element: <OnlineOrders /> },
-      { path: "store-shelf", element: <StoreShelf /> },
+      {
+        element: <Layout />,
+        children: [
+          { index: true, element: <Navigate to="/cashier/dashboard" replace /> },
+          { path: "dashboard", element: <CashierDashboard /> },
+          { path: "pos", element: <POS /> },
+          { path: "online-orders", element: <OnlineOrders /> },
+          { path: "store-shelf", element: <StoreShelf /> },
+        ]
+      }
     ],
   },
 ]);

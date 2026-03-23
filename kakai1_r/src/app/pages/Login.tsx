@@ -1,27 +1,13 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router";
-import { useAuth, mockUsers, UserRole } from "../context/AuthContext";
+import { useAuth, UserRole } from "../context/AuthContext";
 import { LogIn, Eye, EyeOff } from "lucide-react";
 
-const demoPasswords: Record<number, string> = {
-  1: "admin123",
-  2: "staff123",
-  3: "stockman123",
-  4: "cashier123",
-  5: "customer123",
-};
-
-const roleColors: Record<UserRole, string> = {
-  admin: "bg-purple-100 text-purple-700 border-purple-200",
-  staff: "bg-blue-100 text-blue-700 border-blue-200",
-  stockman: "bg-green-100 text-green-700 border-green-200",
-  cashier: "bg-orange-100 text-orange-700 border-orange-200",
-  customer: "bg-slate-100 text-slate-700 border-slate-200",
-};
+// Update this to match your new API location
+const API_URL = "http://localhost/kakai1_r/api";
 
 const roleHomeMap: Record<UserRole, string> = {
   admin: "/admin/dashboard",
-  staff: "/admin/dashboard",
   stockman: "/stockman/dashboard",
   cashier: "/cashier/dashboard",
   customer: "/customer",
@@ -30,33 +16,51 @@ const roleHomeMap: Record<UserRole, string> = {
 export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [email, setEmail] = useState("");
+
+  // Changed from email to username to match the database
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
-    setTimeout(() => {
-      const user = mockUsers.find((u) => u.email === email);
-      if (!user || demoPasswords[user.id] !== password) {
-        setError("Invalid email or password.");
-        setLoading(false);
-        return;
-      }
-      login(user);
-      navigate(roleHomeMap[user.role]);
-      setLoading(false);
-    }, 600);
-  };
 
-  const quickLogin = (userId: number) => {
-    const user = mockUsers.find((u) => u.id === userId)!;
-    login(user);
-    navigate(roleHomeMap[user.role]);
+    try {
+      const response = await fetch(`${API_URL}/auth/login.php`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include", // Ensures the PHP session cookie is saved in the browser
+        body: JSON.stringify({
+          username: username,
+          password: password,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        // Pass the user data from PHP directly to the AuthContext
+        login(data.user);
+
+        // Route them to the correct dashboard based on their role
+        const destination = roleHomeMap[data.user.role as UserRole] || "/login";
+        navigate(destination);
+      } else {
+        // Display the error message sent from PHP (e.g., "Invalid password")
+        setError(data.message || "Login failed. Please try again.");
+      }
+    } catch (err) {
+      console.error("Login request failed:", err);
+      setError("Cannot connect to the server. Please check your connection.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -76,13 +80,13 @@ export default function Login() {
           <h2 className="text-slate-800 font-semibold mb-6">Sign In</h2>
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="block text-slate-600 text-sm mb-1.5">Email Address</label>
+              <label className="block text-slate-600 text-sm mb-1.5">Username</label>
               <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 text-slate-800"
-                placeholder="your@email.com"
+                placeholder="Enter your username"
                 required
               />
             </div>
@@ -112,31 +116,6 @@ export default function Login() {
               {loading ? "Signing in..." : "Sign In"}
             </button>
           </form>
-
-          {/* Quick Login */}
-          <div className="mt-6 pt-5 border-t border-slate-100">
-            <p className="text-slate-400 text-xs mb-3 text-center">Quick Demo Login</p>
-            <div className="space-y-2">
-              {mockUsers.map((u) => (
-                <button
-                  key={u.id}
-                  onClick={() => quickLogin(u.id)}
-                  className="w-full flex items-center justify-between px-3 py-2 rounded-lg border hover:bg-slate-50 transition-colors"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 text-xs font-bold">{u.avatar}</div>
-                    <div className="text-left">
-                      <p className="text-slate-700 text-xs font-medium">{u.name}</p>
-                      <p className="text-slate-400 text-xs">{u.email}</p>
-                    </div>
-                  </div>
-                  <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${roleColors[u.role]}`}>
-                    {u.role}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
 
         <p className="text-center text-purple-300/60 text-xs mt-5">
