@@ -37,8 +37,8 @@ export default function SupplierDirectory() {
           phone: s.phone || "",
           email: s.email || "",
           address: s.address || "",
-          products: "General Wholesale", // Default since it's not in DB
-          status: "Active" // Default to keep your stat cards working
+          products: s.supplied_products || "General",
+          status: s.status || "Active"
         }));
         setSuppliers(formatted);
       }
@@ -72,10 +72,12 @@ export default function SupplierDirectory() {
     const payload = {
       id: editSupplier?.id,
       name: form.name,
-      contact_person: form.contact, // Map UI 'contact' to DB 'contact_person'
+      contact_person: form.contact,
       phone: form.phone,
       email: form.email,
-      address: form.address
+      address: form.address,
+      status: form.status,
+      supplied_products: form.products // Pass the products to the DB
     };
 
     try {

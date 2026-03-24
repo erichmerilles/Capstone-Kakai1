@@ -3,7 +3,7 @@ import { Truck, AlertTriangle, Plus, X, CheckCircle } from "lucide-react";
 
 const API_URL = "http://localhost/kakai1_r/api";
 
-// Define our interfaces based on the database
+// Define interfaces for our live data
 interface Product {
   id: number;
   name: string;
@@ -45,9 +45,16 @@ export default function ReceiveReturn() {
   // Load Data
   const fetchData = async () => {
     try {
-      // Fetch Products
-      const prodRes = await fetch(`${API_URL}/inventory/get_inventory.php`, { credentials: "include" });
+      const [prodRes, moveRes, suppRes] = await Promise.all([
+        fetch(`${API_URL}/inventory/get_inventory.php`, { credentials: "include" }),
+        fetch(`${API_URL}/inventory/get_movements.php`, { credentials: "include" }),
+        fetch(`${API_URL}/suppliers/get_suppliers.php`, { credentials: "include" })
+      ]);
+
       const prodData = await prodRes.json();
+      const moveData = await moveRes.json();
+      const suppData = await suppRes.json();
+
       if (prodData.success) {
         setProducts(prodData.data);
         if (prodData.data.length > 0) {
@@ -56,14 +63,8 @@ export default function ReceiveReturn() {
         }
       }
 
-      // Fetch Movements (Activity Log)
-      const moveRes = await fetch(`${API_URL}/inventory/get_movements.php`, { credentials: "include" });
-      const moveData = await moveRes.json();
       if (moveData.success) setMovements(moveData.data);
 
-      // Fetch Suppliers (We will create this quick endpoint below)
-      const suppRes = await fetch(`${API_URL}/suppliers/get_suppliers.php`, { credentials: "include" });
-      const suppData = await suppRes.json();
       if (suppData.success) {
         setSuppliers(suppData.data);
         if (suppData.data.length > 0) setReceiveForm(prev => ({ ...prev, supplierId: suppData.data[0].id }));
@@ -83,6 +84,14 @@ export default function ReceiveReturn() {
   const receiveLogs = movements.filter(m => m.type === "receive");
   const damageLogs = movements.filter(m => m.type === "adjustment" || m.type === "return");
   const todayDeliveries = receiveLogs.filter(m => m.date.includes(new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })));
+  const activeSuppliers = suppliers.filter((s) => s.status !== "Inactive").length;
+
+  // Helper to extract Supplier Name from the database note
+  const parseLogData = (rawNote: string) => {
+    const match = rawNote.match(/(.*) \(From: (.*)\)/);
+    if (match) return { note: match[1], supplier: match[2] };
+    return { note: rawNote, supplier: "General" };
+  };
 
   // Submit Receive
   const handleReceive = async () => {
@@ -100,7 +109,7 @@ export default function ReceiveReturn() {
           product_id: receiveForm.productId,
           location: locationMap,
           quantity: Number(receiveForm.qty),
-          remarks: `${receiveForm.note} (From: ${supplierName})`
+          remarks: `${receiveForm.note || "Restock"} (From: ${supplierName})`
         })
       });
 
@@ -109,7 +118,7 @@ export default function ReceiveReturn() {
         setReceiveSuccess(true);
         setShowReceiveForm(false);
         setReceiveForm({ ...receiveForm, qty: "", note: "" });
-        fetchData(); // Refresh logs
+        fetchData();
         setTimeout(() => setReceiveSuccess(false), 3000);
       } else alert(data.message);
     } catch (error) {
@@ -132,8 +141,8 @@ export default function ReceiveReturn() {
           product_id: damageForm.productId,
           location: locationMap,
           quantity: Number(damageForm.qty),
-          action: "adjustment", // Action type for damages
-          remarks: damageForm.reason
+          action: "adjustment",
+          remarks: damageForm.reason || "Damaged/Lost"
         })
       });
 
@@ -141,7 +150,7 @@ export default function ReceiveReturn() {
       if (data.success) {
         setShowDamageForm(false);
         setDamageForm({ ...damageForm, qty: "", reason: "" });
-        fetchData(); // Refresh logs
+        fetchData();
       } else alert(data.message);
     } catch (error) {
       alert("Network error.");
@@ -180,16 +189,16 @@ export default function ReceiveReturn() {
             </button>
           </div>
 
-          {/* Info Cards */}
+          {/* Info Cards (Restored Original Layout) */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="bg-white rounded-xl p-5 border border-slate-100 shadow-sm">
               <p className="text-slate-400 text-xs">Today's Deliveries</p>
-              <p className="text-slate-800 font-bold text-2xl mt-1">{todayDeliveries.length}</p>
+              <p className="text-slate-800 font-bold text-2xl mt-1">{isLoading ? "-" : todayDeliveries.length}</p>
               <p className="text-slate-400 text-xs mt-1">Shipments received</p>
             </div>
             <div className="bg-white rounded-xl p-5 border border-slate-100 shadow-sm">
               <p className="text-slate-400 text-xs">Active Suppliers</p>
-              <p className="text-slate-800 font-bold text-2xl mt-1">{suppliers.length}</p>
+              <p className="text-slate-800 font-bold text-2xl mt-1">{isLoading ? "-" : activeSuppliers}</p>
               <p className="text-slate-400 text-xs mt-1">Registered suppliers</p>
             </div>
             <div className="bg-white rounded-xl p-5 border border-slate-100 shadow-sm">
@@ -199,7 +208,7 @@ export default function ReceiveReturn() {
             </div>
           </div>
 
-          {/* Recent Receipts */}
+          {/* Recent Receipts Table (Restored Supplier Column) */}
           <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
               <Truck size={15} className="text-orange-500" />
@@ -211,25 +220,28 @@ export default function ReceiveReturn() {
                   <tr className="bg-slate-50 text-slate-500 text-xs">
                     <th className="px-4 py-3 text-left font-medium">Date</th>
                     <th className="px-4 py-3 text-left font-medium">Product</th>
+                    <th className="px-4 py-3 text-left font-medium">Supplier</th>
                     <th className="px-4 py-3 text-right font-medium">Qty</th>
-                    <th className="px-4 py-3 text-left font-medium">Location</th>
                     <th className="px-4 py-3 text-left font-medium">Note</th>
                     <th className="px-4 py-3 text-left font-medium">Recorded By</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {isLoading ? <tr><td colSpan={6} className="text-center py-4">Loading...</td></tr> :
-                    receiveLogs.length === 0 ? <tr><td colSpan={6} className="text-center py-4 text-slate-400">No shipments found.</td></tr> :
-                      receiveLogs.map(log => (
-                        <tr key={log.id} className="hover:bg-slate-50/50">
-                          <td className="px-4 py-3 text-slate-500 text-xs">{log.date}</td>
-                          <td className="px-4 py-3 text-slate-700 font-medium">{log.product}</td>
-                          <td className="px-4 py-3 text-right font-semibold text-slate-700">+{log.qty}</td>
-                          <td className="px-4 py-3 text-slate-500 text-xs capitalize">{log.location}</td>
-                          <td className="px-4 py-3 text-slate-400 text-xs">{log.note}</td>
-                          <td className="px-4 py-3 text-slate-500 text-xs">{log.user}</td>
-                        </tr>
-                      ))}
+                  {isLoading ? <tr><td colSpan={6} className="text-center py-6 text-slate-400">Loading...</td></tr> :
+                    receiveLogs.length === 0 ? <tr><td colSpan={6} className="text-center py-6 text-slate-400">No shipments found.</td></tr> :
+                      receiveLogs.map(log => {
+                        const parsed = parseLogData(log.note);
+                        return (
+                          <tr key={log.id} className="hover:bg-slate-50/50">
+                            <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">{log.date.split(" ")[0]}</td>
+                            <td className="px-4 py-3 text-slate-700 font-medium">{log.product}</td>
+                            <td className="px-4 py-3 text-slate-500">{parsed.supplier}</td>
+                            <td className="px-4 py-3 text-right font-semibold text-slate-700">{log.qty} {log.location === "wholesale" ? "boxes" : "pcs"}</td>
+                            <td className="px-4 py-3 text-slate-400 text-xs">{parsed.note}</td>
+                            <td className="px-4 py-3 text-slate-500 text-xs">{log.user}</td>
+                          </tr>
+                        )
+                      })}
                 </tbody>
               </table>
             </div>
@@ -245,6 +257,7 @@ export default function ReceiveReturn() {
             </button>
           </div>
 
+          {/* Damage Table (Restored Exact Initial Layout) */}
           <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
               <AlertTriangle size={15} className="text-red-500" />
@@ -257,22 +270,24 @@ export default function ReceiveReturn() {
                     <th className="px-4 py-3 text-left font-medium">Date</th>
                     <th className="px-4 py-3 text-left font-medium">Product</th>
                     <th className="px-4 py-3 text-right font-medium">Qty</th>
-                    <th className="px-4 py-3 text-left font-medium">From Location</th>
                     <th className="px-4 py-3 text-left font-medium">Reason</th>
                     <th className="px-4 py-3 text-left font-medium">Recorded By</th>
+                    <th className="px-4 py-3 text-left font-medium">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {isLoading ? <tr><td colSpan={6} className="text-center py-4">Loading...</td></tr> :
-                    damageLogs.length === 0 ? <tr><td colSpan={6} className="text-center py-4 text-slate-400">No damage records found.</td></tr> :
+                  {isLoading ? <tr><td colSpan={6} className="text-center py-6 text-slate-400">Loading...</td></tr> :
+                    damageLogs.length === 0 ? <tr><td colSpan={6} className="text-center py-6 text-slate-400">No damage records found.</td></tr> :
                       damageLogs.map(log => (
                         <tr key={log.id} className="hover:bg-slate-50/50">
-                          <td className="px-4 py-3 text-slate-500 text-xs">{log.date}</td>
+                          <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">{log.date.split(" ")[0]}</td>
                           <td className="px-4 py-3 text-slate-700 font-medium">{log.product}</td>
-                          <td className="px-4 py-3 text-right font-semibold text-red-500">{log.qty}</td>
-                          <td className="px-4 py-3 text-slate-500 text-xs capitalize">{log.location}</td>
+                          <td className="px-4 py-3 text-right font-semibold text-red-500">-{log.qty} {log.location === "wholesale" ? "boxes" : "pcs"}</td>
                           <td className="px-4 py-3 text-slate-500 text-xs">{log.note}</td>
                           <td className="px-4 py-3 text-slate-500 text-xs">{log.user}</td>
+                          <td className="px-4 py-3">
+                            <span className="text-xs px-2 py-1 rounded-full border font-medium bg-green-50 text-green-600 border-green-200">Confirmed</span>
+                          </td>
                         </tr>
                       ))}
                 </tbody>
@@ -282,7 +297,7 @@ export default function ReceiveReturn() {
         </div>
       )}
 
-      {/* Receive Form Modal */}
+      {/* Receive Form Modal (Restored Exact Input Groupings) */}
       {showReceiveForm && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
@@ -293,14 +308,14 @@ export default function ReceiveReturn() {
             <div className="p-5 space-y-4">
               <div>
                 <label className="text-slate-500 text-xs mb-1 block">Supplier</label>
-                <select value={receiveForm.supplierId} onChange={(e) => setReceiveForm({ ...receiveForm, supplierId: Number(e.target.value) })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                <select value={receiveForm.supplierId} onChange={(e) => setReceiveForm({ ...receiveForm, supplierId: Number(e.target.value) })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white">
                   <option value={0}>General Delivery (No Supplier)</option>
                   {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
               </div>
               <div>
                 <label className="text-slate-500 text-xs mb-1 block">Product</label>
-                <select value={receiveForm.productId} onChange={(e) => setReceiveForm({ ...receiveForm, productId: Number(e.target.value) })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                <select value={receiveForm.productId} onChange={(e) => setReceiveForm({ ...receiveForm, productId: Number(e.target.value) })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white">
                   {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
               </div>
@@ -310,10 +325,10 @@ export default function ReceiveReturn() {
                   <input type="number" min={1} value={receiveForm.qty} onChange={(e) => setReceiveForm({ ...receiveForm, qty: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
                 </div>
                 <div>
-                  <label className="text-slate-500 text-xs mb-1 block">Unit (Location)</label>
-                  <select value={receiveForm.unit} onChange={(e) => setReceiveForm({ ...receiveForm, unit: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
-                    <option value="boxes">Boxes (Wholesale)</option>
-                    <option value="pcs">Pcs (Retail)</option>
+                  <label className="text-slate-500 text-xs mb-1 block">Unit</label>
+                  <select value={receiveForm.unit} onChange={(e) => setReceiveForm({ ...receiveForm, unit: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white">
+                    <option value="boxes">boxes</option>
+                    <option value="pcs">pcs</option>
                   </select>
                 </div>
               </div>
@@ -330,7 +345,7 @@ export default function ReceiveReturn() {
         </div>
       )}
 
-      {/* Damage Form Modal */}
+      {/* Damage Form Modal (Restored Exact Input Groupings) */}
       {showDamageForm && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
@@ -341,20 +356,20 @@ export default function ReceiveReturn() {
             <div className="p-5 space-y-4">
               <div>
                 <label className="text-slate-500 text-xs mb-1 block">Product</label>
-                <select value={damageForm.productId} onChange={(e) => setDamageForm({ ...damageForm, productId: Number(e.target.value) })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400">
+                <select value={damageForm.productId} onChange={(e) => setDamageForm({ ...damageForm, productId: Number(e.target.value) })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 bg-white">
                   {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-slate-500 text-xs mb-1 block">Quantity to Deduct</label>
+                  <label className="text-slate-500 text-xs mb-1 block">Quantity</label>
                   <input type="number" min={1} value={damageForm.qty} onChange={(e) => setDamageForm({ ...damageForm, qty: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400" />
                 </div>
                 <div>
-                  <label className="text-slate-500 text-xs mb-1 block">From Location</label>
-                  <select value={damageForm.unit} onChange={(e) => setDamageForm({ ...damageForm, unit: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400">
-                    <option value="pcs">Retail WH (pcs)</option>
-                    <option value="boxes">Wholesale WH (boxes)</option>
+                  <label className="text-slate-500 text-xs mb-1 block">Unit</label>
+                  <select value={damageForm.unit} onChange={(e) => setDamageForm({ ...damageForm, unit: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 bg-white">
+                    <option value="pcs">pcs</option>
+                    <option value="boxes">boxes</option>
                   </select>
                 </div>
               </div>
