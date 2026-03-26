@@ -3,9 +3,9 @@ import { Search, Plus, Pencil, Trash2, X, UserCheck } from "lucide-react";
 
 const API_URL = "http://localhost/kakai1_r/api";
 
+// Updated to match the exact database role codes
 const roleColors: Record<string, string> = {
-  administrator: "bg-purple-50 text-purple-600 border-purple-200",
-  staff: "bg-blue-50 text-blue-600 border-blue-200",
+  admin: "bg-purple-50 text-purple-600 border-purple-200",
   stockman: "bg-green-50 text-green-600 border-green-200",
   cashier: "bg-orange-50 text-orange-600 border-orange-200",
 };
@@ -27,9 +27,10 @@ export default function UserManagement() {
         const formatted = data.data.map((u: any) => ({
           id: u.id,
           name: u.full_name || u.username,
-          email: u.email || "No email",
-          phone: u.phone || "No phone",
-          role: u.role === "admin" ? "Administrator" : u.role.charAt(0).toUpperCase() + u.role.slice(1),
+          email: u.email || "",
+          phone: u.phone || "",
+          role: u.role, // The exact DB code (admin, cashier, stockman)
+          displayRole: u.role === "admin" ? "Administrator" : u.role.charAt(0).toUpperCase() + u.role.slice(1), // What the UI shows
           status: u.status || "Active",
           dateHired: u.date_hired || "N/A",
           lastLogin: u.last_login || "Never logged in",
@@ -51,10 +52,10 @@ export default function UserManagement() {
   const filtered = employees.filter((e) =>
     e.name.toLowerCase().includes(search.toLowerCase()) ||
     e.email.toLowerCase().includes(search.toLowerCase()) ||
-    e.role.toLowerCase().includes(search.toLowerCase())
+    e.displayRole.toLowerCase().includes(search.toLowerCase())
   );
 
-  const openNew = () => { setEditEmp(null); setForm({ role: "Staff", status: "Active" }); setShowForm(true); };
+  const openNew = () => { setEditEmp(null); setForm({ role: "cashier", status: "Active" }); setShowForm(true); };
   const openEdit = (e: any) => { setEditEmp(e); setForm({ ...e, password: "" }); setShowForm(true); };
 
   const save = async () => {
@@ -130,14 +131,17 @@ export default function UserManagement() {
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {["All", "Administrator", "Stockman", "Cashier"].map((r) => (
-          <div key={r} className="bg-white rounded-xl p-4 border border-slate-100 shadow-sm">
-            <p className="text-slate-400 text-xs">{r === "All" ? "Total Users" : r + "s"}</p>
-            <p className="text-slate-800 font-bold text-2xl mt-1">
-              {isLoading ? "-" : r === "All" ? employees.length : employees.filter((e) => e.role === r).length}
-            </p>
-          </div>
-        ))}
+        {["All", "admin", "stockman", "cashier"].map((r) => {
+          const label = r === "All" ? "Total Users" : r === "admin" ? "Administrators" : r.charAt(0).toUpperCase() + r.slice(1) + "s";
+          return (
+            <div key={r} className="bg-white rounded-xl p-4 border border-slate-100 shadow-sm">
+              <p className="text-slate-400 text-xs">{label}</p>
+              <p className="text-slate-800 font-bold text-2xl mt-1">
+                {isLoading ? "-" : r === "All" ? employees.length : employees.filter((e) => e.role === r).length}
+              </p>
+            </div>
+          );
+        })}
       </div>
 
       <div className="relative">
@@ -173,14 +177,14 @@ export default function UserManagement() {
                       </div>
                       <div>
                         <p className="text-slate-700 font-medium">{e.name}</p>
-                        <p className="text-slate-400 text-xs">{e.email}</p>
+                        <p className="text-slate-400 text-xs">{e.email || "No email"}</p>
                       </div>
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`text-xs px-2 py-1 rounded-full border font-medium ${roleColors[e.role.toLowerCase()] || "bg-slate-50 text-slate-500 border-slate-200"}`}>{e.role}</span>
+                    <span className={`text-xs px-2 py-1 rounded-full border font-medium ${roleColors[e.role] || "bg-slate-50 text-slate-500 border-slate-200"}`}>{e.displayRole}</span>
                   </td>
-                  <td className="px-4 py-3 text-slate-500 text-xs">{e.phone}</td>
+                  <td className="px-4 py-3 text-slate-500 text-xs">{e.phone || "No phone"}</td>
                   <td className="px-4 py-3 text-slate-500 text-xs">{e.dateHired}</td>
                   <td className="px-4 py-3 text-slate-400 text-xs">{e.lastLogin}</td>
                   <td className="px-4 py-3">
@@ -213,21 +217,26 @@ export default function UserManagement() {
               <div><label className="text-slate-500 text-xs mb-1 block">Email (Used for login username)</label><input type="email" value={form.email || ""} onChange={(e) => setForm({ ...form, email: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" /></div>
               <div><label className="text-slate-500 text-xs mb-1 block">Phone</label><input value={form.phone || ""} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" /></div>
               <div><label className="text-slate-500 text-xs mb-1 block">{editEmp ? "New Password (Optional)" : "Password"}</label><input type="password" value={form.password || ""} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="Min. 6 characters" className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" /></div>
+
               <div className="grid grid-cols-2 gap-3">
-                <div><label className="text-slate-500 text-xs mb-1 block">Role</label>
-                  <select value={form.role || "Staff"} onChange={(e) => setForm({ ...form, role: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
-                    <option value="Administrator">Administrator</option>
-                    <option value="Stockman">Stockman</option>
-                    <option value="Cashier">Cashier</option>
+                <div>
+                  <label className="text-slate-500 text-xs mb-1 block">Role</label>
+                  {/* Fixed Dropdown Values to match exact DB codes */}
+                  <select value={form.role || "cashier"} onChange={(e) => setForm({ ...form, role: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                    <option value="admin">Administrator</option>
+                    <option value="stockman">Stockman</option>
+                    <option value="cashier">Cashier</option>
                   </select>
                 </div>
-                <div><label className="text-slate-500 text-xs mb-1 block">Status</label>
+                <div>
+                  <label className="text-slate-500 text-xs mb-1 block">Status</label>
                   <select value={form.status || "Active"} onChange={(e) => setForm({ ...form, status: e.target.value as any })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
                     <option value="Active">Active</option>
                     <option value="Inactive">Inactive</option>
                   </select>
                 </div>
               </div>
+
               <div className="flex gap-3 pt-2">
                 <button onClick={() => setShowForm(false)} className="flex-1 border border-slate-200 text-slate-600 rounded-lg py-2.5 text-sm font-medium hover:bg-slate-50">Cancel</button>
                 <button onClick={save} className="flex-1 bg-orange-500 hover:bg-orange-600 text-white rounded-lg py-2.5 text-sm font-medium transition-colors">Save User</button>

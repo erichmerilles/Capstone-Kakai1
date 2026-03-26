@@ -71,7 +71,7 @@ export default function AdminDashboard() {
             day: new Date(t.sale_date).toLocaleDateString('en-US', { weekday: 'short' }),
             month: new Date(t.sale_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
             sales: Number(t.daily_revenue),
-            profit: Number(t.daily_profit) // EXACT MATH APPLIED HERE
+            profit: Number(t.daily_profit)
           }));
           setTrends(formattedTrends);
 

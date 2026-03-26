@@ -10,6 +10,7 @@ export interface Product {
   name: string;
   category: string;
   barcode: string;
+  buyingPrice: number; // Added Buying Price
   sellingPrice: number;
   wholesalePrice: number;
   retailPrice: number;
@@ -46,12 +47,13 @@ export default function ProductMasterList() {
           name: p.name,
           category: p.category || "Uncategorized",
           barcode: p.sku,
-          sellingPrice: parseFloat(p.selling_price),
-          wholesalePrice: parseFloat(p.wholesale_price),
-          retailPrice: parseFloat(p.retail_price),
-          wholesaleStock: parseInt(p.wholesale_stock),
-          retailStock: parseInt(p.retail_stock),
-          shelfStock: parseInt(p.shelf_stock),
+          buyingPrice: parseFloat(p.buying_price || 0), // Mapped Buying Price
+          sellingPrice: parseFloat(p.selling_price || 0),
+          wholesalePrice: parseFloat(p.wholesale_price || 0),
+          retailPrice: parseFloat(p.retail_price || 0),
+          wholesaleStock: parseInt(p.wholesale_stock || 0),
+          retailStock: parseInt(p.retail_stock || 0),
+          shelfStock: parseInt(p.shelf_stock || 0),
           expiryDate: p.expiry_date || "",
           unit: p.unit || "pcs",
           pcsPerBox: parseInt(p.pcs_per_box) || 1,
@@ -94,6 +96,7 @@ export default function ProductMasterList() {
       category: form.category,
       unit: form.unit,
       pcs_per_box: form.pcsPerBox,
+      buying_price: form.buyingPrice, // Added to payload
       wholesale_price: form.wholesalePrice,
       retail_price: form.retailPrice,
       selling_price: form.sellingPrice,
@@ -174,6 +177,7 @@ export default function ProductMasterList() {
               <tr className="bg-slate-50 text-slate-500 text-xs">
                 <th className="px-4 py-3 text-left font-medium">Product</th>
                 <th className="px-4 py-3 text-left font-medium">Category</th>
+                <th className="px-4 py-3 text-right font-medium">Buying ₱</th> {/* Added Header */}
                 <th className="px-4 py-3 text-right font-medium">Wholesale ₱</th>
                 <th className="px-4 py-3 text-right font-medium">Retail ₱</th>
                 <th className="px-4 py-3 text-right font-medium">Selling ₱</th>
@@ -188,11 +192,11 @@ export default function ProductMasterList() {
             <tbody className="divide-y divide-slate-50">
               {isLoading ? (
                 <tr>
-                  <td colSpan={11} className="py-12 text-center text-slate-400">Loading products...</td>
+                  <td colSpan={12} className="py-12 text-center text-slate-400">Loading products...</td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="py-12 text-center text-slate-400">
+                  <td colSpan={12} className="py-12 text-center text-slate-400">
                     <Package size={32} className="mx-auto mb-2 opacity-30" />
                     <p className="text-sm">No products found</p>
                   </td>
@@ -204,18 +208,19 @@ export default function ProductMasterList() {
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <div className="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center text-sm flex-shrink-0">🍟</div>
-                          <span className="text-slate-700 font-medium">{p.name}</span>
+                          <span className="text-slate-700 font-medium truncate max-w-[150px]">{p.name}</span>
                         </div>
                       </td>
                       <td className="px-4 py-3"><span className="bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded-full">{p.category}</span></td>
-                      <td className="px-4 py-3 text-right text-slate-700">₱{p.wholesalePrice}</td>
-                      <td className="px-4 py-3 text-right text-slate-700">₱{p.retailPrice}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-orange-600">₱{p.sellingPrice}</td>
+                      <td className="px-4 py-3 text-right text-slate-500">₱{Number(p.buyingPrice || 0).toFixed(2)}</td> {/* Added Data */}
+                      <td className="px-4 py-3 text-right text-slate-700">₱{Number(p.wholesalePrice || 0).toFixed(2)}</td>
+                      <td className="px-4 py-3 text-right text-slate-700">₱{Number(p.retailPrice || 0).toFixed(2)}</td>
+                      <td className="px-4 py-3 text-right font-semibold text-orange-600">₱{Number(p.sellingPrice || 0).toFixed(2)}</td>
                       <td className="px-4 py-3 text-right font-semibold text-slate-700">{p.wholesaleStock}</td>
                       <td className="px-4 py-3 text-right font-semibold text-slate-700">{p.retailStock}</td>
                       <td className="px-4 py-3 text-right font-semibold text-slate-700">{p.shelfStock}</td>
-                      <td className="px-4 py-3 text-xs text-slate-500">{p.expiryDate}</td>
-                      <td className="px-4 py-3 text-slate-400 text-xs font-mono">{p.barcode}</td>
+                      <td className="px-4 py-3 text-xs text-slate-500">{p.expiryDate || "N/A"}</td>
+                      <td className="px-4 py-3 text-slate-400 text-xs font-mono truncate max-w-[100px]">{p.barcode}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-center gap-1">
                           <button onClick={() => openEdit(p)} className="p-1.5 rounded-lg hover:bg-blue-50 text-slate-400 hover:text-blue-500"><Pencil size={13} /></button>
@@ -269,8 +274,12 @@ export default function ProductMasterList() {
                 </div>
               </div>
 
-              {/* Row 3: Pricing */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-3 rounded-lg border border-slate-100">
+              {/* Row 3: Pricing (Now 4 columns to include Buying Price) */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                <div>
+                  <label className="text-slate-500 text-xs mb-1 block">Buying Price ₱</label>
+                  <input type="number" step="0.01" value={form.buyingPrice || ""} onChange={(e) => setForm({ ...form, buyingPrice: Number(e.target.value) })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white" />
+                </div>
                 <div>
                   <label className="text-slate-500 text-xs mb-1 block">Wholesale Price ₱</label>
                   <input type="number" step="0.01" value={form.wholesalePrice || ""} onChange={(e) => setForm({ ...form, wholesalePrice: Number(e.target.value) })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white" />

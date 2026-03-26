@@ -1,5 +1,8 @@
-import React, { useState } from "react";
-import { ShieldCheck, Check, X } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { ShieldCheck, Check, X, Loader2 } from "lucide-react";
+
+// Point to your environment variable for the API URL
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost/kakai1_r/api";
 
 interface Permission {
   id: string;
@@ -30,22 +33,40 @@ const permissions: Permission[] = [
   { id: "activity_view", module: "Activity Log", action: "View Activity Log", description: "Access system activity logs" },
 ];
 
-const defaultAccess: Record<string, Record<string, boolean>> = {
-  Administrator: Object.fromEntries(permissions.map((p) => [p.id, true])),
-  Staff: { dash_view: true, pos_access: true, online_orders: true, products_view: true },
-  Stockman: {
-    dash_view: true, products_view: true, receive_shipment: true, damage_entry: true,
-    inv_breakdown: true, stock_transfer: true, stock_adjust: true, suppliers_view: true,
-  },
-  Cashier: { dash_view: true, pos_access: true, online_orders: true, products_view: true },
-};
-
-const roles = ["Administrator", "Staff", "Stockman", "Cashier"];
+const roles = ["Administrator", "Stockman", "Cashier"];
 const modules = [...new Set(permissions.map((p) => p.module))];
 
 export default function AccessControl() {
-  const [access, setAccess] = useState(defaultAccess);
+  const [access, setAccess] = useState<Record<string, Record<string, boolean>>>({});
   const [saved, setSaved] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // 1. Load the permissions from the MySQL database when the page loads
+  useEffect(() => {
+    const fetchPermissions = async () => {
+      try {
+        const response = await fetch(`${API_URL}/auth/get_permissions.php`, {
+          method: "GET",
+          credentials: "include"
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          // Force Administrator to always have all permissions locally
+          data.Administrator = Object.fromEntries(permissions.map((p) => [p.id, true]));
+          setAccess(data);
+        } else {
+          console.error("Failed to fetch permissions");
+        }
+      } catch (error) {
+        console.error("Error loading permissions:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchPermissions();
+  }, []);
 
   const toggle = (role: string, permId: string) => {
     if (role === "Administrator") return; // Admin always has all access
@@ -55,10 +76,40 @@ export default function AccessControl() {
     }));
   };
 
-  const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  // 2. Save exactly what is checked to the MySQL database
+  const handleSave = async () => {
+    try {
+      setSaved(true); // Temporarily show saving state
+
+      const response = await fetch(`${API_URL}/auth/update_permissions.php`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(access)
+      });
+
+      if (!response.ok) throw new Error("Failed to save to database");
+
+      // Broadcast an event so the Sidebar (if still listening) instantly knows permissions changed
+      window.dispatchEvent(new Event("rbacUpdated"));
+
+      setTimeout(() => setSaved(false), 2000);
+    } catch (error) {
+      console.error("Error saving permissions:", error);
+      alert("Failed to save permissions to the database. Check your connection.");
+      setSaved(false);
+    }
   };
+
+  // Show a loading spinner while fetching data
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 space-y-4">
+        <Loader2 className="animate-spin text-orange-500" size={40} />
+        <p className="text-slate-500">Loading access controls...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -84,12 +135,10 @@ export default function AccessControl() {
                 <th className="px-4 py-3 text-left text-slate-500 text-xs font-medium w-64">Permission</th>
                 {roles.map((r) => (
                   <th key={r} className="px-4 py-3 text-center text-xs font-medium min-w-24">
-                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                      r === "Administrator" ? "bg-purple-100 text-purple-700" :
-                      r === "Stockman" ? "bg-green-100 text-green-700" :
-                      r === "Cashier" ? "bg-orange-100 text-orange-700" :
-                      "bg-blue-100 text-blue-700"
-                    }`}>{r}</span>
+                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${r === "Administrator" ? "bg-purple-100 text-purple-700" :
+                        r === "Stockman" ? "bg-green-100 text-green-700" :
+                          "bg-orange-100 text-orange-700"
+                      }`}>{r}</span>
                   </th>
                 ))}
               </tr>
@@ -113,11 +162,10 @@ export default function AccessControl() {
                           <button
                             onClick={() => toggle(role, perm.id)}
                             disabled={role === "Administrator"}
-                            className={`w-7 h-7 rounded-lg flex items-center justify-center mx-auto transition-colors ${
-                              access[role]?.[perm.id]
+                            className={`w-7 h-7 rounded-lg flex items-center justify-center mx-auto transition-colors ${access[role]?.[perm.id]
                                 ? "bg-green-100 text-green-600 hover:bg-green-200"
                                 : "bg-slate-100 text-slate-300 hover:bg-slate-200"
-                            } ${role === "Administrator" ? "cursor-not-allowed" : "cursor-pointer"}`}
+                              } ${role === "Administrator" ? "cursor-not-allowed" : "cursor-pointer"}`}
                           >
                             {access[role]?.[perm.id] ? <Check size={13} /> : <X size={13} />}
                           </button>

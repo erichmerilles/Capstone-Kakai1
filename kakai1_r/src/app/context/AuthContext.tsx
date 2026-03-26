@@ -8,6 +8,9 @@ export interface User {
   id: number;
   username: string;
   role: UserRole;
+  name: string;
+  avatar: string;
+  permissions: string[]; // <-- 1. Added this so TypeScript knows to expect the array
 }
 
 interface AuthContextType {
@@ -34,7 +37,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const data = await response.json();
 
         if (response.ok && data.isAuthenticated) {
-          setUser(data.user);
+          // Map database fields to the React UI and provide fallbacks
+          setUser({
+            ...data.user,
+            name: data.user.full_name || data.user.username || "User",
+            avatar: data.user.avatar || "👤",
+            permissions: data.user.permissions || [] // <-- 2. Safely store the DB permissions
+          });
         }
       } catch (error) {
         console.error("Session check failed:", error);
@@ -47,7 +56,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = (userData: User) => {
-    setUser(userData);
+    // When logging in, ensure we also apply the fallbacks
+    setUser({
+      ...userData,
+      name: userData.name || (userData as any).full_name || userData.username || "User",
+      avatar: userData.avatar || "👤",
+      permissions: userData.permissions || [] // <-- 3. Safely store permissions on login
+    });
   };
 
   const logout = async () => {
