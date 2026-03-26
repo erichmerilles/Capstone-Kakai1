@@ -11,10 +11,11 @@ if (!isset($data->id) || !isset($data->sku) || !isset($data->name) || !isset($da
 }
 
 try {
+    // Added buying_price to the UPDATE statement
     $stmt = $pdo->prepare("
         UPDATE products SET 
             sku = ?, name = ?, category = ?, unit = ?, pcs_per_box = ?, 
-            wholesale_price = ?, retail_price = ?, selling_price = ?, 
+            buying_price = ?, wholesale_price = ?, retail_price = ?, selling_price = ?, 
             expiry_date = ?
         WHERE id = ?
     ");
@@ -25,6 +26,7 @@ try {
         $data->category ?? 'Uncategorized',
         $data->unit ?? 'pcs',
         $data->pcs_per_box ?? 1,
+        $data->buying_price ?? 0,
         $data->wholesale_price ?? 0,
         $data->retail_price ?? 0,
         $data->selling_price,

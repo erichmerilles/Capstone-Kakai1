@@ -14,9 +14,9 @@ try {
     $stmt = $pdo->prepare("
         INSERT INTO products (
             sku, name, category, unit, pcs_per_box, 
-            wholesale_price, retail_price, selling_price, 
+            buying_price, wholesale_price, retail_price, selling_price, 
             expiry_date
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
 
     $stmt->execute([
@@ -25,6 +25,7 @@ try {
         $data->category ?? 'Uncategorized',
         $data->unit ?? 'pcs',
         $data->pcs_per_box ?? 1,
+        $data->buying_price ?? 0,
         $data->wholesale_price ?? 0,
         $data->retail_price ?? 0,
         $data->selling_price,

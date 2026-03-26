@@ -18,26 +18,49 @@ $username = $data->username;
 $password = $data->password;
 
 // Use a prepared statement to prevent SQL Injection
-$stmt = $pdo->prepare("SELECT id, username, password_hash, role FROM users WHERE username = ?");
+// Note: Added full_name and avatar to the SELECT statement
+$stmt = $pdo->prepare("SELECT id, username, password_hash, role, full_name, avatar FROM users WHERE username = ?");
 $stmt->execute([$username]);
 $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-// Verify the password (assuming you used password_hash() when creating users)
+// Verify the password
 if ($user && password_verify($password, $user['password_hash'])) {
 
-    // Create the session variables
+    // 1. Fetch permissions for this specific role
+    $role = strtolower($user['role']);
+    $permissions = [];
+
+    try {
+        if ($role === 'admin' || $role === 'administrator') {
+            $permStmt = $pdo->query("SELECT id FROM permissions");
+            $permissions = $permStmt->fetchAll(PDO::FETCH_COLUMN);
+        } else {
+            $permStmt = $pdo->prepare("SELECT permission_id FROM role_permissions WHERE role_name = ? AND is_allowed = 1");
+            $permStmt->execute([$role]);
+            $permissions = $permStmt->fetchAll(PDO::FETCH_COLUMN);
+        }
+    } catch (Exception $e) {
+        // Log error silently so login doesn't totally crash, just returns empty permissions
+        error_log("Failed to fetch permissions during login: " . $e->getMessage());
+    }
+
+    // 2. Create the session variables
     $_SESSION['user_id'] = $user['id'];
     $_SESSION['username'] = $user['username'];
     $_SESSION['role'] = $user['role'];
 
-    // Send the success response back to React
+    // 3. Send the success response back to React, complete with permissions
     echo json_encode([
         "success" => true,
         "message" => "Login successful",
+        "isAuthenticated" => true, // Added to match validate_session structure
         "user" => [
             "id" => $user['id'],
             "username" => $user['username'],
-            "role" => $user['role']
+            "role" => $user['role'],
+            "full_name" => $user['full_name'] ?? null,
+            "avatar" => $user['avatar'] ?? null,
+            "permissions" => $permissions // <-- Attached here!
         ]
     ]);
 } else {

@@ -8,8 +8,12 @@ header('Content-Type: application/json');
 try {
     // Join with users table to get the Cashier's actual name/username
     $stmt = $pdo->query("
-        SELECT s.id, s.receipt_number, s.total_amount, s.payment_method, 
+        SELECT s.id, 
+               s.receipt_number, 
+               s.total_amount, 
+               s.payment_method, 
                DATE_FORMAT(s.created_at, '%b %d, %Y %h:%i %p') as date, 
+               s.created_at, /* <-- ADDED THIS LINE SO REACT CAN DO THE MATH */
                u.username as cashier
         FROM sales s
         LEFT JOIN users u ON s.cashier_id = u.id

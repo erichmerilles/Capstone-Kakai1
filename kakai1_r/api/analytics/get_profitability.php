@@ -1,19 +1,18 @@
 <?php
-// api/analytics/get_profitability.php
 require '../db.php';
 require '../auth_guard.php';
 
 header('Content-Type: application/json');
 
 try {
-    // Calculate total revenue, cost, and profit per product
+    // Calculate total revenue, TRUE cost (using buying_price), and profit per product
     $stmt = $pdo->query("
         SELECT 
             p.name, 
             p.sku, 
             SUM(si.quantity) as items_sold, 
             SUM(si.subtotal) as total_revenue,
-            SUM(si.quantity * p.wholesale_price) as total_cost
+            SUM(si.quantity * p.buying_price) as total_cost
         FROM sale_items si
         JOIN products p ON si.product_id = p.id
         JOIN sales s ON si.sale_id = s.id
