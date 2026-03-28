@@ -1,18 +1,11 @@
 <?php
-// get_permissions.php
-header("Access-Control-Allow-Origin: http://localhost:5173"); // Change to your frontend URL
+// api/auth/get_permissions.php
+header("Access-Control-Allow-Origin: http://localhost:5173");
 header("Access-Control-Allow-Credentials: true");
 header("Content-Type: application/json");
 
-// Database connection (adjust to match your setup)
-$host = 'localhost';
-$db   = 'kakai_db'; // Your database name
-$user = 'root';
-$pass = '';
-$charset = 'utf8mb4';
-
-$dsn = "mysql:host=$host;dbname=$db;charset=$charset";
-$pdo = new PDO($dsn, $user, $pass, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+// Use your main database connection instead of a hardcoded one!
+require '../db.php';
 
 try {
     // Get all allowed permissions
@@ -26,7 +19,6 @@ try {
 
     // Format the database rows into the JSON structure React expects
     foreach ($results as $row) {
-        // Convert lowercase database role to Title Case for the React state
         $roleTitleCase = ucfirst(strtolower($row['role_name']));
 
         if (isset($formattedData[$roleTitleCase])) {

@@ -1,6 +1,6 @@
 <?php
-// update_permissions.php
-header("Access-Control-Allow-Origin: http://localhost:5173"); // Change to your frontend URL
+// api/auth/update_permissions.php
+header("Access-Control-Allow-Origin: http://localhost:5173");
 header("Access-Control-Allow-Methods: POST, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type");
 header("Access-Control-Allow-Credentials: true");
@@ -11,14 +11,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit(0);
 }
 
-$host = 'localhost';
-$db   = 'kakai_db'; // Your database name
-$user = 'root';
-$pass = '';
-$charset = 'utf8mb4';
-
-$dsn = "mysql:host=$host;dbname=$db;charset=$charset";
-$pdo = new PDO($dsn, $user, $pass, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+// Use your main database connection instead of a hardcoded one!
+require '../db.php';
 
 // Get JSON payload from React
 $json = file_get_contents('php://input');

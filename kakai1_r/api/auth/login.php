@@ -18,7 +18,6 @@ $username = $data->username;
 $password = $data->password;
 
 // Use a prepared statement to prevent SQL Injection
-// Note: Added full_name and avatar to the SELECT statement
 $stmt = $pdo->prepare("SELECT id, username, password_hash, role, full_name, avatar FROM users WHERE username = ?");
 $stmt->execute([$username]);
 $user = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -40,7 +39,6 @@ if ($user && password_verify($password, $user['password_hash'])) {
             $permissions = $permStmt->fetchAll(PDO::FETCH_COLUMN);
         }
     } catch (Exception $e) {
-        // Log error silently so login doesn't totally crash, just returns empty permissions
         error_log("Failed to fetch permissions during login: " . $e->getMessage());
     }
 
@@ -49,22 +47,34 @@ if ($user && password_verify($password, $user['password_hash'])) {
     $_SESSION['username'] = $user['username'];
     $_SESSION['role'] = $user['role'];
 
-    // 3. Send the success response back to React, complete with permissions
+    // 3. RECORD THE LOGIN ACTIVITY
+    try {
+        $logStmt = $pdo->prepare("INSERT INTO activity_log (user_id, action, module, details) VALUES (?, ?, ?, ?)");
+        $logAction = "User Login";
+        $logModule = "Auth";
+        $logDetails = "User '" . $user['username'] . "' successfully logged in.";
+        $logStmt->execute([$user['id'], $logAction, $logModule, $logDetails]);
+    } catch (Exception $e) {
+        // Log the error to the server log so it doesn't block the actual login process
+        error_log("Failed to record login activity: " . $e->getMessage());
+    }
+
+    // 4. Send the success response back to React, complete with permissions
     echo json_encode([
         "success" => true,
         "message" => "Login successful",
-        "isAuthenticated" => true, // Added to match validate_session structure
+        "isAuthenticated" => true,
         "user" => [
             "id" => $user['id'],
             "username" => $user['username'],
             "role" => $user['role'],
             "full_name" => $user['full_name'] ?? null,
             "avatar" => $user['avatar'] ?? null,
-            "permissions" => $permissions // <-- Attached here!
+            "permissions" => $permissions
         ]
     ]);
 } else {
     // Invalid credentials
-    http_response_code(401); // Unauthorized status code
+    http_response_code(401);
     echo json_encode(["success" => false, "message" => "Invalid username or password."]);
 }
