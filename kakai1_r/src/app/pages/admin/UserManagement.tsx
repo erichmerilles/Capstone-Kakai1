@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { Search, Plus, Pencil, Trash2, X, UserCheck } from "lucide-react";
+import { Search, Plus, Pencil, Trash2, X, UserCheck, Loader2 } from "lucide-react";
 
 const API_URL = "http://localhost/kakai1_r/api";
 
-// Updated to match the exact database role codes
+// Matches the exact database role codes
 const roleColors: Record<string, string> = {
   admin: "bg-purple-50 text-purple-600 border-purple-200",
   stockman: "bg-green-50 text-green-600 border-green-200",
@@ -27,14 +27,17 @@ export default function UserManagement() {
         const formatted = data.data.map((u: any) => ({
           id: u.id,
           name: u.full_name || u.username,
+          username: u.username,
           email: u.email || "",
           phone: u.phone || "",
-          role: u.role, // The exact DB code (admin, cashier, stockman)
-          displayRole: u.role === "admin" ? "Administrator" : u.role.charAt(0).toUpperCase() + u.role.slice(1), // What the UI shows
+          role: u.role,
+          displayRole: u.role === "admin" ? "Administrator" : u.role.charAt(0).toUpperCase() + u.role.slice(1),
           status: u.status || "Active",
-          dateHired: u.date_hired || "N/A",
-          lastLogin: u.last_login || "Never logged in",
-          username: u.username
+          dateHired: u.date_hired ? new Date(u.date_hired).toLocaleDateString() : "N/A",
+          // Format the new last_login column
+          lastLogin: u.last_login
+            ? new Date(u.last_login).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
+            : "Never logged in"
         }));
         setEmployees(formatted);
       }
@@ -51,19 +54,37 @@ export default function UserManagement() {
 
   const filtered = employees.filter((e) =>
     e.name.toLowerCase().includes(search.toLowerCase()) ||
-    e.email.toLowerCase().includes(search.toLowerCase()) ||
+    e.username.toLowerCase().includes(search.toLowerCase()) ||
     e.displayRole.toLowerCase().includes(search.toLowerCase())
   );
 
-  const openNew = () => { setEditEmp(null); setForm({ role: "cashier", status: "Active" }); setShowForm(true); };
-  const openEdit = (e: any) => { setEditEmp(e); setForm({ ...e, password: "" }); setShowForm(true); };
+  const openNew = () => {
+    setEditEmp(null);
+    setForm({ role: "cashier", status: "Active" });
+    setShowForm(true);
+  };
+
+  const openEdit = (e: any) => {
+    setEditEmp(e);
+    setForm({
+      ...e,
+      full_name: e.name, // Ensure we use full_name for the backend
+      password: ""
+    });
+    setShowForm(true);
+  };
 
   const save = async () => {
-    if (!form.name) return alert("Full name is required.");
+    if (!form.name && !form.full_name) return alert("Full name is required.");
     if (!editEmp && !form.password) return alert("Password is required for new accounts.");
 
     const endpoint = editEmp ? "edit_user.php" : "add_user.php";
-    const payload = editEmp ? { ...form, id: editEmp.id } : form;
+    // Ensure payload matches backend expectations for 'full_name'
+    const payload = {
+      ...form,
+      full_name: form.name || form.full_name,
+      id: editEmp?.id
+    };
 
     try {
       const response = await fetch(`${API_URL}/users/${endpoint}`, {
@@ -86,7 +107,7 @@ export default function UserManagement() {
   };
 
   const del = async (id: number) => {
-    if (!confirm("Delete this user?")) return;
+    if (!confirm("Delete this user? This action cannot be undone.")) return;
     try {
       const response = await fetch(`${API_URL}/users/delete_user.php`, {
         method: "POST",
@@ -109,7 +130,7 @@ export default function UserManagement() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ ...emp, status: newStatus })
+        body: JSON.stringify({ ...emp, full_name: emp.name, status: newStatus })
       });
       const data = await response.json();
       if (data.success) fetchUsers();
@@ -137,7 +158,7 @@ export default function UserManagement() {
             <div key={r} className="bg-white rounded-xl p-4 border border-slate-100 shadow-sm">
               <p className="text-slate-400 text-xs">{label}</p>
               <p className="text-slate-800 font-bold text-2xl mt-1">
-                {isLoading ? "-" : r === "All" ? employees.length : employees.filter((e) => e.role === r).length}
+                {isLoading ? <Loader2 className="animate-spin inline" size={18} /> : r === "All" ? employees.length : employees.filter((e) => e.role === r).length}
               </p>
             </div>
           );
@@ -146,7 +167,7 @@ export default function UserManagement() {
 
       <div className="relative">
         <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name, email, or role…" className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white" />
+        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name, username, or role…" className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white" />
       </div>
 
       <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
@@ -177,16 +198,16 @@ export default function UserManagement() {
                       </div>
                       <div>
                         <p className="text-slate-700 font-medium">{e.name}</p>
-                        <p className="text-slate-400 text-xs">{e.email || "No email"}</p>
+                        <p className="text-slate-400 text-xs">@{e.username}</p>
                       </div>
                     </div>
                   </td>
                   <td className="px-4 py-3">
                     <span className={`text-xs px-2 py-1 rounded-full border font-medium ${roleColors[e.role] || "bg-slate-50 text-slate-500 border-slate-200"}`}>{e.displayRole}</span>
                   </td>
-                  <td className="px-4 py-3 text-slate-500 text-xs">{e.phone || "No phone"}</td>
+                  <td className="px-4 py-3 text-slate-500 text-xs">{e.phone || "—"}</td>
                   <td className="px-4 py-3 text-slate-500 text-xs">{e.dateHired}</td>
-                  <td className="px-4 py-3 text-slate-400 text-xs">{e.lastLogin}</td>
+                  <td className="px-4 py-3 text-slate-600 text-xs font-medium">{e.lastLogin}</td>
                   <td className="px-4 py-3">
                     <button onClick={() => toggleStatus(e)} className={`text-xs px-2 py-1 rounded-full border font-medium transition-colors ${e.status === "Active" ? "bg-green-50 text-green-600 border-green-200 hover:bg-green-100" : "bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100"}`}>
                       {e.status}
@@ -213,15 +234,26 @@ export default function UserManagement() {
               <button onClick={() => setShowForm(false)} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
             </div>
             <div className="p-5 space-y-3">
-              <div><label className="text-slate-500 text-xs mb-1 block">Full Name</label><input value={form.name || ""} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" /></div>
-              <div><label className="text-slate-500 text-xs mb-1 block">Email (Used for login username)</label><input type="email" value={form.email || ""} onChange={(e) => setForm({ ...form, email: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" /></div>
-              <div><label className="text-slate-500 text-xs mb-1 block">Phone</label><input value={form.phone || ""} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" /></div>
-              <div><label className="text-slate-500 text-xs mb-1 block">{editEmp ? "New Password (Optional)" : "Password"}</label><input type="password" value={form.password || ""} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="Min. 6 characters" className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" /></div>
+              <div>
+                <label className="text-slate-500 text-xs mb-1 block">Full Name</label>
+                <input value={form.name || ""} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+              </div>
+              <div>
+                <label className="text-slate-500 text-xs mb-1 block">Username (Login ID)</label>
+                <input value={form.username || ""} onChange={(e) => setForm({ ...form, username: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" disabled={!!editEmp} />
+              </div>
+              <div>
+                <label className="text-slate-500 text-xs mb-1 block">Email (Optional)</label>
+                <input type="email" value={form.email || ""} onChange={(e) => setForm({ ...form, email: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+              </div>
+              <div>
+                <label className="text-slate-500 text-xs mb-1 block">{editEmp ? "New Password (Optional)" : "Password"}</label>
+                <input type="password" value={form.password || ""} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder={editEmp ? "Leave blank to keep current" : "Min. 6 characters"} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+              </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-slate-500 text-xs mb-1 block">Role</label>
-                  {/* Fixed Dropdown Values to match exact DB codes */}
                   <select value={form.role || "cashier"} onChange={(e) => setForm({ ...form, role: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
                     <option value="admin">Administrator</option>
                     <option value="stockman">Stockman</option>

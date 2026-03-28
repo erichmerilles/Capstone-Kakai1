@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { ShieldCheck, Check, X, Loader2 } from "lucide-react";
 
-// Point to your environment variable for the API URL
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost/kakai1_r/api";
+const API_URL = (import.meta as any).env.VITE_API_URL || "http://localhost/kakai1_r/api";
 
 interface Permission {
   id: string;

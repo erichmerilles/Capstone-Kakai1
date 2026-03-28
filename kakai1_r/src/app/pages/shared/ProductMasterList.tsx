@@ -1,16 +1,15 @@
 import React, { useState, useEffect } from "react";
 import { Search, Plus, Pencil, Trash2, X, Package } from "lucide-react";
+import { useAuth } from "../../context/AuthContext"; // 🔥 Imported AuthContext
 
-// Point this to your new API folder structure
 const API_URL = "http://localhost/kakai1_r/api";
 
-// We define the Product interface here now instead of using mockData
 export interface Product {
   id: number;
   name: string;
   category: string;
   barcode: string;
-  buyingPrice: number; // Added Buying Price
+  buyingPrice: number;
   sellingPrice: number;
   wholesalePrice: number;
   retailPrice: number;
@@ -23,6 +22,7 @@ export interface Product {
 }
 
 export default function ProductMasterList() {
+  const { user } = useAuth(); // 🔥 Get the current user's permissions
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState("");
   const [catFilter, setCatFilter] = useState("All");
@@ -31,23 +31,24 @@ export default function ProductMasterList() {
   const [form, setForm] = useState<Partial<Product>>({});
   const [isLoading, setIsLoading] = useState(true);
 
-  // 1. Fetch Products from PHP API
+  // 🔥 Helper to check if they have the specific Edit/Delete permission
+  const canEdit = user?.role === "admin" || (user?.permissions && user.permissions.includes("products_edit"));
+
   const fetchProducts = async () => {
     setIsLoading(true);
     try {
       const response = await fetch(`${API_URL}/products/get_products.php`, {
-        credentials: "include", // Required for the auth_guard.php check
+        credentials: "include",
       });
       const data = await response.json();
 
       if (data.success) {
-        // Map the database columns to your UI variable names
         const formattedData = data.data.map((p: any) => ({
           id: p.id,
           name: p.name,
           category: p.category || "Uncategorized",
           barcode: p.sku,
-          buyingPrice: parseFloat(p.buying_price || 0), // Mapped Buying Price
+          buyingPrice: parseFloat(p.buying_price || 0),
           sellingPrice: parseFloat(p.selling_price || 0),
           wholesalePrice: parseFloat(p.wholesale_price || 0),
           retailPrice: parseFloat(p.retail_price || 0),
@@ -67,7 +68,6 @@ export default function ProductMasterList() {
     }
   };
 
-  // Run the fetch when the page loads
   useEffect(() => {
     fetchProducts();
   }, []);
@@ -83,12 +83,12 @@ export default function ProductMasterList() {
   const openEdit = (p: Product) => { setEditProduct(p); setForm(p); setShowForm(true); };
   const openNew = () => { setEditProduct(null); setForm({ category: "Chicharon", unit: "pcs", pcsPerBox: 24 }); setShowForm(true); };
 
-  // 2. Save Product to PHP API (Handles both Add and Edit)
   const saveProduct = async () => {
+    if (!canEdit) return; // Extra safety check
+
     const isEdit = !!editProduct;
     const endpoint = isEdit ? "edit_product.php" : "add_product.php";
 
-    // Prepare data to match your MySQL database columns
     const payload = {
       id: editProduct?.id,
       sku: form.barcode,
@@ -96,7 +96,7 @@ export default function ProductMasterList() {
       category: form.category,
       unit: form.unit,
       pcs_per_box: form.pcsPerBox,
-      buying_price: form.buyingPrice, // Added to payload
+      buying_price: form.buyingPrice,
       wholesale_price: form.wholesalePrice,
       retail_price: form.retailPrice,
       selling_price: form.sellingPrice,
@@ -114,7 +114,7 @@ export default function ProductMasterList() {
       const data = await response.json();
 
       if (data.success) {
-        fetchProducts(); // Refresh the list from the database
+        fetchProducts();
         setShowForm(false);
       } else {
         alert("Failed to save: " + data.message);
@@ -125,8 +125,8 @@ export default function ProductMasterList() {
     }
   };
 
-  // 3. Delete Product via PHP API
   const deleteProduct = async (id: number) => {
+    if (!canEdit) return; // Extra safety check
     if (!confirm("Delete this product permanently?")) return;
 
     try {
@@ -139,7 +139,7 @@ export default function ProductMasterList() {
 
       const data = await response.json();
       if (data.success) {
-        fetchProducts(); // Refresh the list
+        fetchProducts();
       } else {
         alert("Failed to delete: " + data.message);
       }
@@ -155,9 +155,13 @@ export default function ProductMasterList() {
           <h1 className="text-slate-800 text-xl font-bold">Product Master List</h1>
           <p className="text-slate-400 text-sm">All products with pricing and stock information</p>
         </div>
-        <button onClick={openNew} className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-          <Plus size={16} /> Add Product
-        </button>
+
+        {/* 🔥 Only render "Add Product" if they have the products_edit permission */}
+        {canEdit && (
+          <button onClick={openNew} className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+            <Plus size={16} /> Add Product
+          </button>
+        )}
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3">
@@ -177,7 +181,7 @@ export default function ProductMasterList() {
               <tr className="bg-slate-50 text-slate-500 text-xs">
                 <th className="px-4 py-3 text-left font-medium">Product</th>
                 <th className="px-4 py-3 text-left font-medium">Category</th>
-                <th className="px-4 py-3 text-right font-medium">Buying ₱</th> {/* Added Header */}
+                <th className="px-4 py-3 text-right font-medium">Buying ₱</th>
                 <th className="px-4 py-3 text-right font-medium">Wholesale ₱</th>
                 <th className="px-4 py-3 text-right font-medium">Retail ₱</th>
                 <th className="px-4 py-3 text-right font-medium">Selling ₱</th>
@@ -186,17 +190,19 @@ export default function ProductMasterList() {
                 <th className="px-4 py-3 text-right font-medium">Shelf (pcs)</th>
                 <th className="px-4 py-3 text-left font-medium">Expiry</th>
                 <th className="px-4 py-3 text-left font-medium">SKU/Barcode</th>
-                <th className="px-4 py-3 text-center font-medium">Actions</th>
+
+                {/* 🔥 Only show the Actions column header if they can edit */}
+                {canEdit && <th className="px-4 py-3 text-center font-medium">Actions</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
               {isLoading ? (
                 <tr>
-                  <td colSpan={12} className="py-12 text-center text-slate-400">Loading products...</td>
+                  <td colSpan={canEdit ? 12 : 11} className="py-12 text-center text-slate-400">Loading products...</td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className="py-12 text-center text-slate-400">
+                  <td colSpan={canEdit ? 12 : 11} className="py-12 text-center text-slate-400">
                     <Package size={32} className="mx-auto mb-2 opacity-30" />
                     <p className="text-sm">No products found</p>
                   </td>
@@ -212,7 +218,7 @@ export default function ProductMasterList() {
                         </div>
                       </td>
                       <td className="px-4 py-3"><span className="bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded-full">{p.category}</span></td>
-                      <td className="px-4 py-3 text-right text-slate-500">₱{Number(p.buyingPrice || 0).toFixed(2)}</td> {/* Added Data */}
+                      <td className="px-4 py-3 text-right text-slate-500">₱{Number(p.buyingPrice || 0).toFixed(2)}</td>
                       <td className="px-4 py-3 text-right text-slate-700">₱{Number(p.wholesalePrice || 0).toFixed(2)}</td>
                       <td className="px-4 py-3 text-right text-slate-700">₱{Number(p.retailPrice || 0).toFixed(2)}</td>
                       <td className="px-4 py-3 text-right font-semibold text-orange-600">₱{Number(p.sellingPrice || 0).toFixed(2)}</td>
@@ -221,12 +227,16 @@ export default function ProductMasterList() {
                       <td className="px-4 py-3 text-right font-semibold text-slate-700">{p.shelfStock}</td>
                       <td className="px-4 py-3 text-xs text-slate-500">{p.expiryDate || "N/A"}</td>
                       <td className="px-4 py-3 text-slate-400 text-xs font-mono truncate max-w-[100px]">{p.barcode}</td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-center gap-1">
-                          <button onClick={() => openEdit(p)} className="p-1.5 rounded-lg hover:bg-blue-50 text-slate-400 hover:text-blue-500"><Pencil size={13} /></button>
-                          <button onClick={() => deleteProduct(p.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500"><Trash2 size={13} /></button>
-                        </div>
-                      </td>
+
+                      {/* 🔥 Only render the Edit/Delete buttons if they have permission */}
+                      {canEdit && (
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-center gap-1">
+                            <button onClick={() => openEdit(p)} className="p-1.5 rounded-lg hover:bg-blue-50 text-slate-400 hover:text-blue-500"><Pencil size={13} /></button>
+                            <button onClick={() => deleteProduct(p.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500"><Trash2 size={13} /></button>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   );
                 })
@@ -237,8 +247,9 @@ export default function ProductMasterList() {
       </div>
 
       {/* Form Modal */}
-      {showForm && (
+      {showForm && canEdit && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          {/* ... Your exact existing form code goes here ... */}
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10">
               <h2 className="text-slate-800 font-semibold">{editProduct ? "Edit Product" : "Add Product"}</h2>
@@ -274,7 +285,7 @@ export default function ProductMasterList() {
                 </div>
               </div>
 
-              {/* Row 3: Pricing (Now 4 columns to include Buying Price) */}
+              {/* Row 3: Pricing */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-slate-50 p-3 rounded-lg border border-slate-100">
                 <div>
                   <label className="text-slate-500 text-xs mb-1 block">Buying Price ₱</label>

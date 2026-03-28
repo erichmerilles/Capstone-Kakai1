@@ -52,7 +52,7 @@ export default function StoreShelf() {
     <div className="space-y-4">
       <div>
         <h1 className="text-slate-800 text-xl font-bold">Store Shelf Stocks</h1>
-        <p className="text-slate-400 text-sm">Current inventory on store shelves (read-only view)</p>
+        <p className="text-slate-400 text-sm">Current inventory on store shelves</p>
       </div>
 
       {/* Summary */}

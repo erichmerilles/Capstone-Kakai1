@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { Link, useLocation, useNavigate } from "react-router"; // Changed to react-router-dom
+import React, { useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router";
 import {
   LayoutDashboard, ShoppingCart, Package, BarChart3,
   Users, LogOut, ChevronDown, ChevronRight,
@@ -7,7 +7,7 @@ import {
   AlertTriangle, UserCheck, Activity, Store,
   MessageSquare, BoxSelect, ShieldCheck, ReceiptText, Layers
 } from "lucide-react";
-import { useAuth, UserRole } from "../../context/AuthContext";
+import { useAuth, UserRole, User } from "../../context/AuthContext";
 
 interface NavItem {
   label: string;
@@ -16,86 +16,103 @@ interface NavItem {
   children?: NavItem[];
 }
 
-// Default permissions so users aren't locked out before the Admin saves RBAC settings
-const DEFAULT_RBAC = {
-  Cashier: {
-    dash_view: true,
-    pos_access: true,
-    products_view: true, // Needed for Store Shelf View
-  },
-  Stockman: {
-    dash_view: true,
-    products_view: true,
-    receive_shipment: true,
-    stock_adjust: true,
-    stock_transfer: true,
-    suppliers_view: true,
-  }
-};
+// Dynamically builds the navigation based ONLY on the database permissions
+function getNavItems(user: User): NavItem[] {
+  const role = user.role;
 
-// Dynamically builds the navigation based on the saved RBAC permissions
-function getNavItems(role: UserRole, rbac: any): NavItem[] {
-  // Map the internal role to the Display Role saved in RBAC
-  const roleName = role === "admin" ? "Administrator" : role.charAt(0).toUpperCase() + role.slice(1);
-
-  // Use localStorage RBAC, or fall back to defaults if empty
-  const myPerms = rbac[roleName] || DEFAULT_RBAC[roleName as keyof typeof DEFAULT_RBAC] || {};
-
-  // Admin bypasses all checks; others check their specific boolean permission
-  const hasPerm = (permId: string) => role === "admin" || myPerms[permId];
+  // 1. Master Permission Checker: Reads directly from the DB array attached to the user
+  const hasPerm = (permId: string) => {
+    if (role === "admin") return true; // Admins always have all access
+    return user.permissions && user.permissions.includes(permId);
+  };
 
   const items: NavItem[] = [];
 
-  if (hasPerm("dash_view")) {
+  // --- DASHBOARD ---
+  // Everyone gets their dashboard as a fallback landing page
+  if (hasPerm("dash_view") || ["admin", "stockman", "cashier"].includes(role)) {
     items.push({ label: "Dashboard", path: `/${role}/dashboard`, icon: <LayoutDashboard size={16} /> });
   }
 
   // --- DAILY OPERATIONS ---
   const dailyOps: NavItem[] = [];
-  if (hasPerm("pos_access")) dailyOps.push({ label: "Point of Sale", path: `/${role}/pos`, icon: <ReceiptText size={15} /> });
-  if (hasPerm("online_orders")) dailyOps.push({ label: "Online Orders", path: `/${role}/online-orders`, icon: <MessageSquare size={15} /> });
-  if (dailyOps.length > 0) items.push({ label: "Daily Operations", icon: <ShoppingCart size={16} />, children: dailyOps });
+  if (hasPerm("pos_access")) {
+    dailyOps.push({ label: "Point of Sale", path: `/${role}/pos`, icon: <ReceiptText size={15} /> });
+  }
+  if (hasPerm("online_orders")) {
+    dailyOps.push({ label: "Online Orders", path: `/${role}/online-orders`, icon: <MessageSquare size={15} /> });
+  }
+
+  // Only render parent folder if there are items inside
+  if (dailyOps.length > 0) {
+    items.push({ label: "Daily Operations", icon: <ShoppingCart size={16} />, children: dailyOps });
+  }
 
   // --- INVENTORY & LOGISTICS ---
   const inventory: NavItem[] = [];
-  if (hasPerm("products_view")) {
-    // Cashiers use a specialized read-only Store Shelf view for products
-    if (role === "cashier") {
-      inventory.push({ label: "Store Shelf Stocks", path: `/cashier/store-shelf`, icon: <Package size={15} /> });
-    } else {
-      inventory.push({ label: "Product Master List", path: `/${role}/products`, icon: <Package size={15} /> });
-    }
+
+  // 1. Store Shelf is a default operational view for EVERYONE (Admin, Stockman, Cashier)
+  if (["admin", "stockman", "cashier"].includes(role)) {
+    inventory.push({ label: "Store Shelf Stocks", path: `/${role}/store-shelf`, icon: <Store size={15} /> });
   }
-  if (hasPerm("receive_shipment")) inventory.push({ label: "Receive & Return", path: `/${role}/receive-return`, icon: <Truck size={15} /> });
-  if (hasPerm("stock_adjust") || hasPerm("stock_transfer") || hasPerm("inv_breakdown")) {
+
+  // 2. Product Master List is strictly controlled by the 'products_view' permission
+  if (hasPerm("products_view")) {
+    inventory.push({ label: "Product Master List", path: `/${role}/products`, icon: <Package size={15} /> });
+  }
+
+  if (hasPerm("receive_shipment")) {
+    inventory.push({ label: "Receive & Return", path: `/${role}/receive-return`, icon: <Truck size={15} /> });
+  }
+
+  // Inventory Control encompasses adjustments, transfers, breakdowns, and damage entry
+  if (hasPerm("stock_adjust") || hasPerm("stock_transfer") || hasPerm("inv_breakdown") || hasPerm("damage_entry")) {
     inventory.push({ label: "Inventory Control", path: `/${role}/inventory-control`, icon: <BoxSelect size={15} /> });
   }
-  if (hasPerm("suppliers_view")) inventory.push({ label: "Supplier Directory", path: `/${role}/suppliers`, icon: <Layers size={15} /> });
 
+  if (hasPerm("suppliers_view")) {
+    inventory.push({ label: "Supplier Directory", path: `/${role}/suppliers`, icon: <Layers size={15} /> });
+  }
+
+  // Only render parent folder if there are items inside
   if (inventory.length > 0) {
-    items.push({
-      label: role === "cashier" && inventory.length === 1 && inventory[0].label.includes("Shelf") ? "Inventory View" : "Inventory & Logistics",
-      icon: role === "cashier" && inventory.length === 1 && inventory[0].label.includes("Shelf") ? <Store size={16} /> : <Warehouse size={16} />,
-      children: inventory
-    });
+    items.push({ label: "Inventory & Logistics", icon: <Warehouse size={16} />, children: inventory });
   }
 
   // --- BUSINESS INTELLIGENCE ---
   const bi: NavItem[] = [];
-  if (hasPerm("reports_view")) bi.push({ label: "Profitability Reports", path: `/admin/profitability`, icon: <TrendingUp size={15} /> });
-  if (hasPerm("forecast_view")) bi.push({ label: "Inventory Forecast", path: `/admin/forecast`, icon: <ClipboardList size={15} /> });
-  if (hasPerm("expiry_view")) bi.push({ label: "Expiry & Low Stock", path: `/admin/expiry-stocks`, icon: <AlertTriangle size={15} /> });
-  if (bi.length > 0) items.push({ label: "Business Intelligence", icon: <BarChart3 size={16} />, children: bi });
+  if (hasPerm("reports_view")) {
+    bi.push({ label: "Profitability Reports", path: `/${role}/profitability`, icon: <TrendingUp size={15} /> });
+  }
+  if (hasPerm("forecast_view")) {
+    bi.push({ label: "Inventory Forecast", path: `/${role}/forecast`, icon: <ClipboardList size={15} /> });
+  }
+  if (hasPerm("expiry_view")) {
+    bi.push({ label: "Expiry & Low Stock", path: `/${role}/expiry-stocks`, icon: <AlertTriangle size={15} /> });
+  }
+
+  // Only render parent folder if there are items inside
+  if (bi.length > 0) {
+    items.push({ label: "Business Intelligence", icon: <BarChart3 size={16} />, children: bi });
+  }
 
   // --- USER MANAGEMENT ---
   const users: NavItem[] = [];
-  if (hasPerm("users_view")) users.push({ label: "User Profiles", path: `/admin/users`, icon: <UserCheck size={15} /> });
-  if (hasPerm("rbac_edit")) users.push({ label: "Access Control", path: `/admin/access-control`, icon: <ShieldCheck size={15} /> });
-  if (users.length > 0) items.push({ label: "User Management", icon: <Users size={16} />, children: users });
+  if (hasPerm("users_view") || hasPerm("users_edit")) {
+    users.push({ label: "User Profiles", path: `/${role}/users`, icon: <UserCheck size={15} /> });
+  }
+  if (hasPerm("rbac_edit")) {
+    users.push({ label: "Access Control", path: `/${role}/access-control`, icon: <ShieldCheck size={15} /> });
+  }
+
+  // Only render parent folder if there are items inside
+  if (users.length > 0) {
+    items.push({ label: "User Management", icon: <Users size={16} />, children: users });
+  }
 
   // --- ACTIVITY LOG ---
   if (hasPerm("activity_view")) {
-    items.push({ label: "Activity Log", path: "/admin/activity-log", icon: <Activity size={16} /> });
+    items.push({ label: "Activity Log", path: `/${role}/activity-log`, icon: <Activity size={16} /> });
   }
 
   return items;
@@ -155,25 +172,11 @@ export function Sidebar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
-  // Lazily initialize state to prevent "No access" from flashing on screen refresh
-  const [rbac, setRbac] = useState<any>(() => {
-    const storedRbac = localStorage.getItem("kakai_rbac_settings");
-    return storedRbac ? JSON.parse(storedRbac) : {};
-  });
-
-  useEffect(() => {
-    const loadRbac = () => {
-      const storedRbac = localStorage.getItem("kakai_rbac_settings");
-      if (storedRbac) setRbac(JSON.parse(storedRbac));
-    };
-
-    window.addEventListener("rbacUpdated", loadRbac);
-    return () => window.removeEventListener("rbacUpdated", loadRbac);
-  }, []);
-
+  // NO MORE LOCAL STORAGE - The Sidebar is completely driven by the database session now
   if (!user) return null;
 
-  const navItems = getNavItems(user.role, rbac);
+  // 2. Pass the entire user object down to map the permissions
+  const navItems = getNavItems(user);
 
   const roleLabel: Record<string, string> = {
     admin: "Administrator",
