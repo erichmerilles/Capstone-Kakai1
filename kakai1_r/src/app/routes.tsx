@@ -57,7 +57,6 @@ export const router = createBrowserRouter([
           { path: "pos", element: <POS /> },
           { path: "online-orders", element: <OnlineOrders /> },
           { path: "products", element: <ProductMasterList /> },
-          { path: "store-shelf", element: <StoreShelf /> }, // 🔥 Added Store Shelf
           { path: "receive-return", element: <ReceiveReturn /> },
           { path: "inventory-control", element: <InventoryControl /> },
           { path: "suppliers", element: <SupplierDirectory /> },

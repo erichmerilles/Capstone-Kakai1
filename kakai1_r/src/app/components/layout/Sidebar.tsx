@@ -51,8 +51,8 @@ function getNavItems(user: User): NavItem[] {
   // --- INVENTORY & LOGISTICS ---
   const inventory: NavItem[] = [];
 
-  // 1. Store Shelf is a default operational view for EVERYONE (Admin, Stockman, Cashier)
-  if (["admin", "stockman", "cashier"].includes(role)) {
+  // 1. Store Shelf is a default operational view for Cashier
+  if (["cashier"].includes(role)) {
     inventory.push({ label: "Store Shelf Stocks", path: `/${role}/store-shelf`, icon: <Store size={15} /> });
   }
 

@@ -115,7 +115,7 @@ export default function AccessControl() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-slate-800 text-xl font-bold">Access Control (RBAC)</h1>
-          <p className="text-slate-400 text-sm">Manage role-based access control for all system features</p>
+          <p className="text-slate-400 text-sm">Manage access control for all system features</p>
         </div>
         <button onClick={handleSave} className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
           <ShieldCheck size={16} /> {saved ? "Saved!" : "Save Changes"}
