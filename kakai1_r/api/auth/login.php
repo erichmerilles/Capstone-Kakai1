@@ -6,11 +6,22 @@ require '../db.php';
 // Tell the browser we are sending JSON back
 header('Content-Type: application/json');
 
-// Get the JSON data sent by React
-$data = json_decode(file_get_contents("php://input"));
+// --- NEW FIX: STRICT METHOD CHECK ---
+// Prevent users from accessing this script directly via a browser URL (GET request)
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405); // 405 Method Not Allowed
+    echo json_encode(["success" => false, "message" => "Method not allowed."]);
+    exit;
+}
 
-if (!isset($data->username) || !isset($data->password)) {
-    echo json_encode(["success" => false, "message" => "Please provide both username and password."]);
+// 1. SAFELY PARSE JSON
+$raw_input = file_get_contents("php://input");
+$data = json_decode($raw_input);
+
+// Check if JSON is valid and required fields exist
+if (json_last_error() !== JSON_ERROR_NONE || !isset($data->username) || !isset($data->password)) {
+    http_response_code(400); // Bad Request
+    echo json_encode(["success" => false, "message" => "Invalid request. Please provide both username and password."]);
     exit;
 }
 
@@ -25,7 +36,7 @@ $user = $stmt->fetch(PDO::FETCH_ASSOC);
 // Verify the password
 if ($user && password_verify($password, $user['password_hash'])) {
 
-    // 1. Fetch permissions for this specific role
+    // Fetch permissions for this specific role
     $role = strtolower($user['role']);
     $permissions = [];
 
@@ -42,12 +53,15 @@ if ($user && password_verify($password, $user['password_hash'])) {
         error_log("Failed to fetch permissions during login: " . $e->getMessage());
     }
 
-    // 2. Create the session variables
+    // 2. PREVENT SESSION FIXATION (Crucial Security Fix)
+    session_regenerate_id(true);
+
+    // Create the session variables
     $_SESSION['user_id'] = $user['id'];
     $_SESSION['username'] = $user['username'];
     $_SESSION['role'] = $user['role'];
 
-    // 3. RECORD THE LOGIN ACTIVITY
+    // RECORD THE LOGIN ACTIVITY
     try {
         $logStmt = $pdo->prepare("INSERT INTO activity_log (user_id, action, module, details) VALUES (?, ?, ?, ?)");
         $logAction = "User Login";
@@ -59,7 +73,7 @@ if ($user && password_verify($password, $user['password_hash'])) {
         error_log("Failed to record login activity: " . $e->getMessage());
     }
 
-    // 4. Send the success response back to React, complete with permissions
+    // Send the success response back to React, complete with permissions
     echo json_encode([
         "success" => true,
         "message" => "Login successful",
@@ -73,8 +87,10 @@ if ($user && password_verify($password, $user['password_hash'])) {
             "permissions" => $permissions
         ]
     ]);
+    exit;
 } else {
     // Invalid credentials
     http_response_code(401);
     echo json_encode(["success" => false, "message" => "Invalid username or password."]);
+    exit;
 }
