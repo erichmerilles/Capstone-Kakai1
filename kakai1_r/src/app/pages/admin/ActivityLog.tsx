@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Search, Activity, Download } from "lucide-react";
 
-const API_URL = "http://localhost/kakai1_r/api";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost/kakai1_r/api";
 
 const actionColors: Record<string, string> = {
   RECEIVE: "bg-green-50 text-green-600 border-green-200",

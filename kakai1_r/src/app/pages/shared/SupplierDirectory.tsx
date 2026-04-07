@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Search, Plus, Pencil, Trash2, X, Phone, Mail, MapPin } from "lucide-react";
 
-const API_URL = "http://localhost/kakai1_r/api";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost/kakai1_r/api";
 
 export interface Supplier {
   id: number;

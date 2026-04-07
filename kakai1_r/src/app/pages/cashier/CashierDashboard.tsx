@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { ReceiptText, MessageSquare, Package, ArrowRight, TrendingUp, ShoppingBag } from "lucide-react";
 
-const API_URL = "http://localhost/kakai1_r/api";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost/kakai1_r/api";
 
 export default function CashierDashboard() {
   const navigate = useNavigate();

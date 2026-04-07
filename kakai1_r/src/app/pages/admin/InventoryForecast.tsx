@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { TrendingDown, Clock, AlertTriangle, CheckCircle } from "lucide-react";
 
-const API_URL = "http://localhost/kakai1_r/api";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost/kakai1_r/api";
 
 export default function InventoryForecast() {
   const [forecasts, setForecasts] = useState<any[]>([]);

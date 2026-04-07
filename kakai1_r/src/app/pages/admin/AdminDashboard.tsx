@@ -9,7 +9,7 @@ import {
   CartesianGrid
 } from "recharts";
 
-const API_URL = "http://localhost/kakai1_r/api";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost/kakai1_r/api";
 const ORANGE = "#f97316";
 const PURPLE = "#7c3aed";
 

@@ -3,8 +3,7 @@ import { useNavigate } from "react-router";
 import { useAuth, UserRole } from "../context/AuthContext";
 import { LogIn, Eye, EyeOff } from "lucide-react";
 
-// Update this to match your new API location
-const API_URL = "http://localhost/kakai1_r/api";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost/kakai1_r/api";
 
 const roleHomeMap: Record<UserRole, string> = {
   admin: "/admin/dashboard",

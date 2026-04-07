@@ -5,7 +5,7 @@ import {
 } from "recharts";
 import { TrendingUp, DollarSign, ShoppingBag, Percent } from "lucide-react";
 
-const API_URL = "http://localhost/kakai1_r/api";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost/kakai1_r/api";
 const COLORS = ["#f97316", "#7c3aed", "#06b6d4", "#10b981", "#f59e0b", "#ef4444"];
 
 export default function ProfitabilityReports() {

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Search, Plus, Pencil, Trash2, X, Package } from "lucide-react";
 import { useAuth } from "../../context/AuthContext"; // 🔥 Imported AuthContext
 
-const API_URL = "http://localhost/kakai1_r/api";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost/kakai1_r/api";
 
 export interface Product {
   id: number;

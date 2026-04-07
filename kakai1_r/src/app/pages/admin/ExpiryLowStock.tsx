@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { AlertTriangle, Clock, Package, Filter } from "lucide-react";
 
-const API_URL = "http://localhost/kakai1_r/api";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost/kakai1_r/api";
 
 export default function ExpiryLowStock() {
   const [view, setView] = useState<"all" | "expiry" | "low">("all");

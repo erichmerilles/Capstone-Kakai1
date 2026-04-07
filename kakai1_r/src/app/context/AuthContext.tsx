@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { toast } from "sonner";
 
-const API_URL = "http://localhost/kakai1_r/api";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost/kakai1_r/api";
 
 export type UserRole = "admin" | "stockman" | "cashier" | "customer";
 
@@ -8,9 +9,10 @@ export interface User {
   id: number;
   username: string;
   role: UserRole;
-  name: string;
-  avatar: string;
-  permissions: string[]; // <-- 1. Added this so TypeScript knows to expect the array
+  full_name?: string;
+  name?: string;
+  avatar?: string;
+  permissions: string[];
 }
 
 interface AuthContextType {
@@ -34,19 +36,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           credentials: "include",
         });
 
+        // FIX: If the user just isn't logged in, do not throw a scary error.
+        if (response.status === 401 || response.status === 403) {
+          setUser(null);
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error(`Server responded with status: ${response.status}`);
+        }
+
         const data = await response.json();
 
-        if (response.ok && data.isAuthenticated) {
-          // Map database fields to the React UI and provide fallbacks
+        if (data.isAuthenticated) {
           setUser({
             ...data.user,
             name: data.user.full_name || data.user.username || "User",
             avatar: data.user.avatar || "👤",
-            permissions: data.user.permissions || [] // <-- 2. Safely store the DB permissions
+            permissions: data.user.permissions || []
           });
         }
       } catch (error) {
         console.error("Session check failed:", error);
+        // Only show this toast if it's an ACTUAL network failure, not just a logged-out user
+        toast.error("Could not connect to the server. Please check your connection.");
       } finally {
         setIsLoading(false);
       }
@@ -56,12 +69,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = (userData: User) => {
-    // When logging in, ensure we also apply the fallbacks
     setUser({
       ...userData,
-      name: userData.name || (userData as any).full_name || userData.username || "User",
+      name: userData.full_name || userData.username || "User",
       avatar: userData.avatar || "👤",
-      permissions: userData.permissions || [] // <-- 3. Safely store permissions on login
+      permissions: userData.permissions || []
     });
   };
 
@@ -71,9 +83,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         method: "POST",
         credentials: "include",
       });
-      setUser(null);
     } catch (error) {
       console.error("Logout failed:", error);
+      toast.error("Network error during logout, but you have been signed out locally.");
+    } finally {
+      // FIX: ALWAYS clear the user from the React UI, even if the server request fails.
+      // This prevents the user from getting "stuck" in the app if their wifi drops.
+      setUser(null);
     }
   };
 
@@ -84,7 +100,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
-// Added the missing useAuth custom hook here
 export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) {

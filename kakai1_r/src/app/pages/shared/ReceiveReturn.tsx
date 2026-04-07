@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Truck, AlertTriangle, Plus, X, CheckCircle } from "lucide-react";
 
-const API_URL = "http://localhost/kakai1_r/api";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost/kakai1_r/api";
 
 // Define interfaces for our live data
 interface Product {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { MessageSquare, Facebook, Phone, Plus, Search, Eye, X } from "lucide-react";
 
-const API_URL = "http://localhost/kakai1_r/api";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost/kakai1_r/api";
 
 const statusColor: Record<string, string> = {
   Pending: "bg-yellow-50 text-yellow-700 border-yellow-200",
